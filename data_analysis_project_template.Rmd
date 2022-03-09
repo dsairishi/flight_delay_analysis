@@ -1,0 +1,463 @@
+---
+title: "Data Analysis Project"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE,
+                      comment = "")
+```
+
+
+
+# Student Information
+
+**Name**: Dendukuri Sai Rishi Varma 
+**G Number**: G01269219
+
+
+
+
+# Introduction
+
+This semester we will be working with a dataset of all domestic outbound flights from Dulles International Airport in 2016.
+
+Airports depend on accurate flight departure and arrival estimates to maintain operations, profitability, customer satisfaction, and compliance with state and federal laws. Flight performance, including departure and arrival delays must be monitored, submitted to the Federal Aviation Agency (FAA) on a regular basis, and minimized to maintain airport operations. **The FAA considered a flight to be delayed if it has an arrival delay of at least 15 minutes**.
+
+The executives at Dulles International Airport have hired you as a Data Science consultant to perform an exploratory data analysis on all domestic flights from 2016 and produce an executive summary of your key insights and recommendations to the executive team.
+
+Before you begin, take a moment to read through the following airline flight terminology to familiarize yourself with the industry: [Airline Flight Terms](https://www.myairlineflight.com)
+
+
+
+## Dulles Flights Data
+
+The `flights_df` data frame is loaded below and consists of 33,433 flights from IAD (Dulles International) in 2016. The rows in this data frame represent a single flight with all of the associated features that are displayed in the table below.
+
+**Note**: If you have not installed the `tidyverse` package, please do so by going to the `Packages` tab in the lower right section of RStudio, select the `Install` button and type `tidyverse` into the prompt. If you cannot load the data, then try downloading the latest version of R (at least 4.0). The `readRDS()` function has different behavior in older versions of `R` and may cause loading issues.
+
+
+
+```{r}
+install.packages("reshape2")
+install.packages("ggridges")
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(ggridges)
+
+flights_df <- readRDS(url('https://gmubusinessanalytics.netlify.app/data/dulles_flights.rds'))
+
+```
+
+
+### Raw Data
+
+```{r}
+
+flights_df
+
+# Creating a new column which consist of "No" for arrival delay <= 15 and "Yes" for arrival_delay > 15. 
+flights_df <- flights_df %>% mutate( Delayed = if_else(arrival_delay > 15, "Yes","No"))
+
+
+# Filtering out those rows whose arrival_delay <= 15.
+flights_df_delayed <- flights_df %>% filter(arrival_delay > 15)
+
+#Displaying the data frame. 
+flights_df_delayed
+
+```
+
+
+# Exploratory Data Analysis
+
+
+Executives at this company have hired you as a data science consultant to evaluate their flight data and make recommendations on flight operations and strategies for minimizing flight delays.
+
+You must think of **at least 8 relevant questions** that will provide evidence for your recommendations.
+
+The goal of your analysis should be discovering which variables drive the differences between flights that are early/on-time vs. flights that are delayed.
+
+Some of the many questions you can explore include:
+
+-   Are flight delays affected by taxi-out time? Do certain airlines or time of 
+    year lead to greater taxi out times (i.e. traffic jams on the runways)?
+
+-   Are certain times of the day or year problematic?
+
+-   Are certain destination or airlines prone to delays?
+
+
+You must answer each question and provide supporting data summaries with either a summary data frame (using `dplyr`/`tidyr`) or a plot (using `ggplot`) or both.
+
+In total, you must have a minimum of 5 plots and 4 summary data frames for the exploratory data analysis section. Among the plots you produce, you must have at least 4 different types (ex. box plot, bar chart,
+histogram, heat map, etc...)
+
+Each question must be answered with supporting evidence from your tables and plots.
+
+
+## Question 1
+
+
+
+**Question**:
+Are flight delays (arrival delays) affected by taxi-in and taxi-out times. 
+
+
+**Answer**:
+The below summary table shows whether a plane is delayed or not with correspondence to average taxi in and taxi out times. We can see that for flights which are delayed, the average taxi in as well as average taxi out times are greater than those for non delayed flights. 
+
+
+To add additional R code chunks for your work, select `Insert` then `R` from the top of this notebook file.
+
+```{r}
+# showing the summary for data frame 
+summary(flights_df)
+
+# Creating a summary table. 
+flights_df_taxi_in_out <-flights_df %>%group_by(Delayed) %>% summarise(Number_of_flights = n(), avg_taxi_out = mean(taxi_out), avg_taxi_in = mean(taxi_in))
+
+#Displaying summary table. 
+flights_df_taxi_in_out
+
+```
+
+
+
+## Question 2
+
+
+
+**Question**:
+Which times of day when a flight departs will lead to delay. 
+
+
+**Answer**:
+Below is the line graph showing departure times and average arrival delays for that corresponding departure time. In the line graph below, numbers from 0 to 25 in the x axis represent the 24 hrs clock format. The values on the graph show average delay for that hour. When we exclude the outliers (which are 167.73, 211, 293, 680), we see the maximum average delay is for those flights whose departure time is from 9:00 PM (20:00 hrs). The second highest delay is for flights departing at 11:00 AM. 
+
+
+```{r}
+# Employing the floor() function to round the values in departure time column to integers. 
+flights_df_delayed$floored_deptime = floor(flights_df_delayed$dep_time)
+
+#Summary Table 
+flights_df_delayed_deptime <- flights_df_delayed %>% 
+  select(Delayed,floored_deptime,arrival_delay) %>%
+  filter(!is.na(floored_deptime) & !is.na(arrival_delay)) %>%
+  group_by(Delayed, floored_deptime) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2)) %>%
+  arrange(floored_deptime)
+
+# Displaying summary table
+flights_df_delayed_deptime
+
+
+#Visualization
+ggplot(data = flights_df_delayed_deptime, aes(x = floored_deptime, y = avg_delay )) +
+  geom_line(color="blue") +
+  geom_point() + 
+  geom_text(hjust=-.25, nudge_y = 2, nudge_x = -.1, size=3.5, aes(label = avg_delay), angle = 90) +
+  scale_x_continuous(breaks = seq(0, 25, 1)) +
+  labs(title = "Dep_time vs Avg_delay",
+           x = "Dep_time", y = "Avg_delay") +
+  theme(plot.title=element_text(hjust=0.5))
+  
+
+
+
+```
+
+
+
+## Question 3
+
+
+
+**Question**:
+Are certain destination cities prone to delays?
+
+
+**Answer**:
+The below graphs depicts the destination airport cities and their average arrival delay times. We can see from the below graph that Minneapolis- St Paul city has maximum arrival delay, followed by Honolulu and Detroit. There is minimum delay for in Austin city. 
+
+```{r fig.height = 5, fig.width = 10}
+
+#Summary Table
+flights_df_delayed_destcity <- flights_df_delayed %>% 
+  select(dest_airport_city,arrival_delay) %>%
+  filter(!is.na(dest_airport_city) & !is.na(arrival_delay)) %>%
+  group_by(dest_airport_city) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2)) %>%
+  arrange(desc(avg_delay))
+
+#Displaying the summary table
+flights_df_delayed_destcity
+
+#Visualization.
+ggplot(data = flights_df_delayed_destcity, aes(x = reorder(dest_airport_city, avg_delay), y = avg_delay )) +
+  geom_col(color="blue", fill = "White" ) +
+  geom_text(size = 2,vjust = 2, aes(label = avg_delay)) +
+  labs(title = "Dest_airport_city vs Avg_delay",
+           x = "Dest_airport_city", y = "Avg_delay") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.title=element_text(hjust=0.5)) 
+ 
+
+```
+
+
+
+
+## Question 4
+ 
+
+**Question**:
+Does time of the month have an effect on the arrival delay ?
+
+
+**Answer**:
+The figure below shows the box plots corresponding to each month an their average arrival delay. Boxplots present five summary statistics for a continuous variable (median, two hinge points, and two whiskers) as well as all "outlying points." From the summary table, we can see that June month has the highest average arrival delay followed by July. Whereas July month has a highest median arrival followed by June month. We can infer that duration of delays in month of july are greater than in June. 
+
+
+```{r}
+
+#Summary table
+flights_df_delayed_month <- flights_df_delayed %>% 
+  select(month,arrival_delay) %>%
+  filter(!is.na(month) & !is.na(arrival_delay)) %>%
+  group_by(month) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2), median_delay = round(median(arrival_delay), 2))
+
+#displaying summary table 
+flights_df_delayed_month  
+
+# Visualization.
+ggplot(data = flights_df_delayed, aes(x = month, y = arrival_delay, fill = month)) + 
+  geom_boxplot() +
+  scale_y_continuous(breaks = seq(0, 300, 25), limits = c(0,300) ) +
+  scale_fill_brewer(palette="Paired") +
+  labs(title = "Month vs avg_delay",
+           x = "Month", y = "avg_delay") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title=element_text(hjust=0.5))
+
+
+
+```
+## Question 5
+Weekday
+
+**Question**:
+Will the arrival delay be affected depending on the day of the week ? 
+
+
+**Answer**:
+The figure below shows the box plots corresponding to each weekday an their average arrival delay. Box plots present five summary statistics for a continuous variable (median, two hinge points, and two whiskers) as well as all "outlying points." From the summary table, we can see that Saturday has the highest average arrival delay and median arrival delay. Next, Monday has the second highest median delay whereas Tuesday has second highest average arrival delay. After Saturday, delays are longer on Mondays. 
+
+
+```{r}
+
+#Summary table
+flights_df_delayed_weekday <- flights_df_delayed %>% 
+  select(weekday,arrival_delay) %>%
+  filter(!is.na(weekday) & !is.na(arrival_delay)) %>%
+  group_by(weekday) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2), median_delay = round(median(arrival_delay), 2))
+
+#Viewing summary table
+flights_df_delayed_weekday
+
+ggplot(flights_df_delayed, aes(x = weekday, y = arrival_delay, fill = weekday)) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = seq(0, 300, 25), limits = c(0,300)) +
+  scale_fill_brewer(palette="BuPu") + 
+  labs(title = "Weekday vs Arrival_delay",
+           x = "Weekday", y = "Arrival_delay") +
+  theme(plot.title=element_text(hjust=0.5))
+  
+
+
+```
+
+## Question 6
+
+
+
+**Question**:
+Which airline are prone to delays ?
+
+
+**Answer**:
+Below is circular bar plot showing airlines and their average arrival delays. From the graph we can see that sky west airlines has the highest average arrival delays followed by frontier. The least being Virgin america airlines. 
+
+```{r}
+
+# Summary table 
+flights_df_delayed_airline <- flights_df_delayed %>% 
+  select(airline,arrival_delay) %>%
+  filter(!is.na(airline) & !is.na(arrival_delay)) %>%
+  group_by(airline) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2)) 
+
+#Viewing summary table
+flights_df_delayed_airline
+
+#Visulaization 
+ggplot(data = flights_df_delayed_airline, aes(x = airline, y = avg_delay )) +
+  geom_col(color="blue", fill = "yellow" ) +
+  geom_text(size = 2,vjust = 2, aes(label = avg_delay)) +
+  labs(title = "airline vs avg_delay",
+           x = "airline", y = "avg_delay") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.title=element_text(hjust=0.5)) +
+  coord_polar( start = 0)
+
+```
+
+
+## Question 7
+Distance - Scatter plot
+
+
+**Question**:
+Will distance have any effect on delay ?
+
+
+**Answer**:
+Below table shows the average delays and average distances for delayed and non delayed flights. We can see that there isn't much difference in the average distance for delayed and non delayed flights. Also from the heatmap below, wwe can see that arrival delay and distance doesn't have much correlation. So we infer that distance does have much effect on arrival delays. 
+
+
+```{r}
+flights_df_distance <- flights_df %>% 
+  select(Delayed,distance,arrival_delay) %>%
+  filter(!is.na(distance) & !is.na(arrival_delay)) %>%
+  group_by(Delayed) %>%
+  summarise( avg_delay = round(mean(arrival_delay), 2), avg_distance = round(mean(distance), 2))
+
+flights_df_distance
+
+
+
+```
+
+
+
+## Question 8
+
+
+**Question**:
+Will departure delay effect the arrival delay ?
+
+
+**Answer**:
+Below is the heat-map( also correlation map) between all the numerical variables in the data set. We can see that for arrival delays have a strong correlation with departure delays and medium correlation with taxi_out time. 
+
+
+```{r}
+# Filtering out non numeric columns from data set
+flights_df_numeric <- select_if(flights_df, is.numeric) 
+
+# Displaying on numeric columns from data set.
+flights_df_numeric
+
+#Finding the correlation between variables.
+cor_flights_df_numeric <-round(cor(flights_df_numeric),2)
+
+#Displaying correlation matrix.
+cor_flights_df_numeric
+
+# Coverting it into summary data frame. 
+cor_flights_df_numeric <- melt(cor_flights_df_numeric)
+
+# Displaying the summary table
+cor_flights_df_numeric
+
+# Visualization. 
+ggplot(data = cor_flights_df_numeric, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  geom_text(aes(x = Var1, y= Var2, label = value), color = "Black", size=3) + 
+  labs(title = "Corelation between all numeric variables") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),plot.title=element_text(hjust=0.5))
+
+```
+
+
+# Summary of Results
+
+Write an executive summary of your overall findings and recommendations to the executives at Dulles Airport. Think of this section as your closing remarks of a presentation, where you summarize your key findings and make recommendations on flight operations and strategies for minimizing flight delays.
+
+Your executive summary must be written in a [professional tone](https://www.universalclass.com/articles/writing/business-writing/appropriate-tone-in-business-communications.htm), with minimal grammatical errors, and should include the following
+sections:
+
+1.  An introduction where you explain the business problem and goals of your data analysis
+
+    -   What problem(s) is this company trying to solve? Why are they important
+        to their future success?
+
+    -   What was the goal of your analysis? What questions were you 
+        trying to answer and why do they matter?
+
+
+2.  Highlights and key findings from your Exploratory Data Analysis section
+
+    -   What were the interesting findings from your analysis and
+        **why are they important for the business**?
+
+    -   This section is meant to **establish the need for your recommendations** 
+        in the following section
+        
+
+3.  Your recommendations to the company
+
+    -   Each recommendation must be supported by your data analysis results
+
+    -   You must clearly explain **why** you are making each recommendation and which results 
+        from your data analysis support this recommendation
+
+    -   You must also describe the potential business impact of your recommendation:
+
+        -   Why is this a good recommendation?
+
+        -   What benefits will the business achieve?
+      
+
+
+## Executive Summary
+
+Please write your executive summary below. If you prefer, you can type your summary in a text editor, such as Microsoft Word, and paste your final text here.
+
+Flight delays are an issue for the company, so they want to minimize them and increase the efficiency of flight operations. This is very important because unless they know the areas where hey are inefficient, there won’t be a scope for improvement in minimizing delays and increasing customer satisfaction. 
+The goal of my analysis is to examine which variables have a bearing on the differences between early/on-time flights vs. delayed flights in your analysis. So, I have identified the below questions: - 
+a) Are flight delays (arrival delays) affected by taxi-in and taxi-out times?
+b) Which times of day when a flight departs will lead to delay?
+c)	Are certain destination cities prone to delays?
+d)	Does time of the month influence the arrival delay?
+e)	Will the arrival delay be affected depending on the day of the week?
+f)	Which airline are prone to delays?
+g)	Will distance have any effect on delay?
+h)	Will departure delay effect the arrival delay?
+These questions gives us an idea what are the factors that cause the delays and to which extent they an effect the delay. Knowing the causes, the company can take necessary measure to reduce the delays. 
+
+##Key findings from the exploratory analysis are as follows: -
+
+We can see that for flights which are delayed, the average taxi in as well as average taxi out times are greater than those for non-delayed flights. We see the maximum average delay is for those flights whose departure time is from 9:00 PM (20:00 hrs.). The second highest delay is for flights departing at 11:00 AM. The Minneapolis- St Paul city has maximum arrival delay, followed by Honolulu and Detroit. There is minimum delay for in Austin city. We can see that June month has the highest average arrival delay followed by July. Whereas July month has a highest median arrival followed by June month. We can infer that duration of delays in month of july are greater than in June. We can see that Saturday has the highest average arrival delay and median arrival delay. Next, Monday has the second highest median delay whereas Tuesday has second highest average arrival delay. After Saturday, delays are longer on Mondays. From the graph we can see that sky west airlines have the highest average arrival delays followed by frontier. The least being Virgin America airlines. We can see that there isn't much difference in the average distance for delayed and non-delayed flights. Also, from the heatmap below, we can see that arrival delay and distance doesn't have much correlation. So, we infer that distance does have much effect on arrival delays. We can see that for arrival delays have a strong correlation with departure delays and medium correlation with taxi out time.These findings surface out the causes for delays and to what extent. Knowledge of what the causes are gives us the answers on how to reduce the delays. 
+
+##Recommendations: - 
+
+From the summary table in question 1, I recommend decreasing the taxi in and out times as this can reduce the delays. This is because delay in one flight’s taxi in or taxi out time, it may cause the subsequent flights to be delays. It would be like chain reaction. So, decreasing taxi in and out times is crucial. From the line graph it is evident that delays are happening for flights which depart at 9 PM to 11PM and at 11 Am in the morning.  Increasing the terminals (or gates) at the times or having a layover in between may help reduce the delays in these times. The delays are more at 	Minneapolis- St Paul followed by Honolulu and Detroit cities. One way to minimize the delays is to distribute the air traffic among the other airports in the cities. By knowing the schedules of arrival and departures in all airports present in the city, we can regulate the air traffic to minimize the delays.  June has a greater number of delays, but July has larger magnitude of delays compared to June. We can reduce these delays by increasing the flights in these months and also having layovers in intermediate airports in these months to reduce delays. Saturdays are the busiest days of the week for air traffic as per the analysis followed by Mondays. So, we can increase the number of flights and airports terminals in each airport present in cities to scale down the traffic. SkyWest is prone to more delays followed by frontier. So, to reduce delays, they need to reduce their taxi in and out times which can reduce the arrival delays. Distance doesn’t have much effect on arrival delay because, the duration of the total journey is estimated keeping the distance as a prime factor. So bigger is the distance, equivalently bigger is the estimated time for journey, so not much effect in delay. Departure delay plays an important role in arriving delays as the estimated duration time violated at the start of the journey itself. Also delaying in departure may cause that flight to wait for other flights while landing as it may intercept other flight landing schedules. So, the departure delays must be reduced. Accurately estimating taxi out times also might arrival delays 
+
+
+
+
+
+
+
+
+
+
+
+
